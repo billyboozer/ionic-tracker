@@ -1,9 +1,9 @@
 angular.module('altecpoc.controllers', [])
 
-.controller('LoginCtrl', function($scope, $firebaseAuth, $location) {
+.controller('LoginCtrl', ['$scope', 'Auth', '$location', '$firebase', function($scope, Auth, $location, $firebase) {
+
   $scope.login = function(username, password) {
-    var fbAuth = $firebaseAuth(fb);
-    fbAuth.$authWithPassword({
+    Auth.$authWithPassword({
       email: username,
       password: password
     }).then(function(authData) {
@@ -13,12 +13,15 @@ angular.module('altecpoc.controllers', [])
     });
   }
 
-  $scope.register = function(username, password) {
-    var fbAuth = $firebaseAuth(fb);
-    fbAuth.$createUser(username, password).then(function() {
-      return fbAuth.$authWithPassword({
+  $scope.register = function(username, password, firstName, lastName, company) {
+    var loginInfo = {email: username, password: password};
+    var profileInfo = {firstName: firstName, lastName: lastName, company: company};
+    Auth.$createUser(loginInfo).then(function() {
+      return Auth.$authWithPassword({
         email: username,
         password: password
+      }).then(function(authData) {
+        return createProfile(authData, angular.extend(loginInfo, profileInfo))
       });
     }).then(function(authData) {
       $location.path("/tab/locations");
@@ -27,8 +30,14 @@ angular.module('altecpoc.controllers', [])
     });
   }
 
+  function createProfile(authData, user){
+    var ref = new Firebase("https://altecpoc.firebaseio.com/");
+    var profileRef = $firebase(ref.child('profile'));
+    return profileRef.$set(authData.uid, user);
+  }
+
   $scope.google = function(){
-    fb.authWithOAuthPopup("google", function(error, authData) {
+    Auth.$authWithOAuthPopup("google", function(error, authData) {
       if (error) {
         console.log("Login Failed!", error);
       } else {
@@ -38,9 +47,9 @@ angular.module('altecpoc.controllers', [])
   }
 
   $scope.logout = function() {
-    fb.unauth();
+    Auth.$unauth();
   };
-})
+}])
 
 .controller('LocationsCtrl', function($scope) {
 })
@@ -49,18 +58,36 @@ angular.module('altecpoc.controllers', [])
   // $scope.location = Locations.get($stateParams.locationId);
 })
 
-.controller('GpsCtrl', function($scope, $ionicLoading) {
+.controller('GpsCtrl', function($scope, $ionicLoading, Auth, $firebase) {
+
+  function storeGisData(data){
+    var ref = new Firebase("https://altecpoc.firebaseio.com/");
+    var gisRef = $firebase(ref.child('gisData'));
+    return gisRef.$set(Auth.$getAuth().uid, data);
+  }
 
   var pathCoords = [];
 
+  var markers = [];
+
+  var foo = 0;
+
   function onSuccess(pos) {
-    console.log('hello', pos);
     myLatlng = new google.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
     $scope.map.setCenter(myLatlng);
 
-    pathCoords.push(myLatlng);
+    if(pathCoords.length == 0){
+      var marker = new google.maps.Marker({
+        position: myLatlng,
+        map: $scope.map
+      });
+      markers.push(marker);
+    }else{
+      markers[0].setPosition(myLatlng);
+    }
 
-    console.log(pathCoords.length);
+    pathCoords.push(myLatlng);
+    storeGisData(pathCoords);
 
     var path = new google.maps.Polyline({
       path: pathCoords,
@@ -71,18 +98,22 @@ angular.module('altecpoc.controllers', [])
     });
 
     path.setMap($scope.map);
-    // var pinIcon = new google.maps.MarkerImage(
-    //   "http://chart.apis.google.com/chart?chst=d_map_pin_letter&chld=%E2%80%A2|FFFF00",
-    //   null, /* size is determined at runtime */
-    //   null, /* origin is 0,0 */
-    //   null, /* anchor is bottom center of the scaled image */
-    //   new google.maps.Size(10, 20)
-    // );
-    // var marker = new google.maps.Marker({
-    //   position: myLatlng,
-    //   map: $scope.map,
-    //   icon: pinIcon
-    // });
+
+    var last_element = pathCoords[pathCoords.length - 1];
+    console.log(pathCoords.length);
+    console.log(last_element);
+
+    // if (foo <= 0){
+    //   var marker = new google.maps.Marker({
+    //     id: 1,
+    //     position: myLatlng,
+    //     map: $scope.map
+    //   });
+    // }else{
+    //   marker.setPosition(myLatlng);
+    // }
+
+    // foo++;
   }
 
   function onError(error) {
@@ -123,5 +154,7 @@ angular.module('altecpoc.controllers', [])
   };
 })
 
-.controller('AccountCtrl', function($scope) {
+.controller('AccountCtrl', function($scope, Auth, $location) {
+  var auth = Auth.$getAuth();
+  $scope.currentUser = auth[auth.auth.provider].email;
 });

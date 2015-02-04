@@ -6,11 +6,11 @@
 // 'starter.services' is found in services.js
 // 'starter.controllers' is found in controllers.js
 
-var fb = null;
+// var fb = null;
 
 angular.module('altecpoc', ['ionic', 'altecpoc.controllers', 'altecpoc.services', 'altecpoc.directives', 'ng-cordova', 'firebase' ])
 
-.run(function($ionicPlatform, $state) {
+.run(function($ionicPlatform, $state, Auth) {
   $ionicPlatform.ready(function() {
     // Hide the accessory bar by default (remove this to show the accessory bar above the keyboard
     // for form inputs)
@@ -21,7 +21,6 @@ angular.module('altecpoc', ['ionic', 'altecpoc.controllers', 'altecpoc.services'
       // org.apache.cordova.statusbar required
       StatusBar.styleDefault();
     }
-    fb = new Firebase("https://altecpoc.firebaseio.com/");
   });
 })
 
@@ -37,14 +36,16 @@ angular.module('altecpoc', ['ionic', 'altecpoc.controllers', 'altecpoc.services'
   .state('login',{
       url:'/login',
       templateUrl:'templates/login.html',
-      controller: 'LoginCtrl'
+      controller: 'LoginCtrl',
+      resolve: {  "currentAuth": ["Auth", function (Auth) { Auth.$waitForAuth(); }] }
   })
 
   // setup an abstract state for the tabs directive
   .state('tab', {
     url: "/tab",
     abstract: true,
-    templateUrl: "templates/tabs.html"
+    templateUrl: "templates/tabs.html",
+    resolve: {  "currentAuth": ["Auth", function (Auth) { Auth.$requireAuth(); }] }
   })
 
   // Each tab has its own nav history stack:
@@ -75,7 +76,8 @@ angular.module('altecpoc', ['ionic', 'altecpoc.controllers', 'altecpoc.services'
         templateUrl: 'templates/tab-account.html',
         controller: 'AccountCtrl'
       }
-    }
+    },
+    resolve: {  "currentAuth": ["Auth", function (Auth) { Auth.$requireAuth(); }] }
   })
 
   .state('tab.gps', {
